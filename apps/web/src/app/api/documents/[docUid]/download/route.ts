@@ -5,19 +5,20 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { requireBearerAuth } from "@/lib/security/auth";
 import { canReadDocument } from "@/lib/security/rbac";
 
-export async function GET(req: NextRequest, { params }: { params: { docUid: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ docUid: string }> }) {
   const service = createServiceClient();
   const auth = await requireBearerAuth(req.headers.get("authorization"));
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { docUid } = await context.params;
 
   const version = Number.parseInt(req.nextUrl.searchParams.get("version") ?? "1", 10);
 
   const { data: doc, error } = await service
     .from("documents")
     .select("doc_uid,doc_type,version,storage_path")
-    .eq("doc_uid", params.docUid)
+    .eq("doc_uid", docUid)
     .eq("version", version)
     .single();
 

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getBrowserSupabaseClient } from "@/lib/supabase/client";
+import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -14,6 +14,11 @@ export default function AccountPage() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isBrowserSupabaseConfigured()) {
+      setMessage("Supabase public environment variables are missing in this deployment.");
+      return;
+    }
+
     const nextFromQuery = new URLSearchParams(window.location.search).get("next");
     if (nextFromQuery) {
       setNextPath(nextFromQuery);
@@ -28,6 +33,10 @@ export default function AccountPage() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    if (!isBrowserSupabaseConfigured()) {
+      setMessage("Supabase public environment variables are missing in this deployment.");
+      return;
+    }
 
     if (mode === "signin") {
       const { error } = await getBrowserSupabaseClient().auth.signInWithPassword({ email, password });
@@ -52,6 +61,10 @@ export default function AccountPage() {
   }
 
   async function onSignOut() {
+    if (!isBrowserSupabaseConfigured()) {
+      setMessage("Supabase public environment variables are missing in this deployment.");
+      return;
+    }
     await getBrowserSupabaseClient().auth.signOut();
     setCurrentUser(null);
     setMessage("Signed out.");

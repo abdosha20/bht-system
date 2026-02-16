@@ -4,17 +4,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { requireBearerAuth } from "@/lib/security/auth";
 
-export async function DELETE(req: NextRequest, { params }: { params: { docUid: string } }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ docUid: string }> }) {
   const auth = await requireBearerAuth(req.headers.get("authorization"));
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { docUid } = await context.params;
 
   const service = createServiceClient();
   const { data: doc, error: fetchError } = await service
     .from("documents")
     .select("doc_uid,version,storage_path,legal_hold,created_by")
-    .eq("doc_uid", params.docUid)
+    .eq("doc_uid", docUid)
     .single();
 
   if (fetchError || !doc) {

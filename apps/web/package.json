@@ -6,21 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "14.2.33",
+    "@supabase/supabase-js": "^2.95.3",
+    "next": "^16.1.6",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "@supabase/supabase-js": "2.56.1"
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "typescript": "5.9.2",
     "@types/node": "22.15.30",
     "@types/react": "18.3.23",
     "@types/react-dom": "18.3.7",
-    "eslint": "8.57.1",
-    "eslint-config-next": "14.2.33"
+    "eslint": "^9.19.0",
+    "eslint-config-next": "^16.1.6",
+    "typescript": "5.9.2"
   }
 }
