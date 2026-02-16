@@ -12,6 +12,19 @@ export default function AccountPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [message, setMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Request timed out. Check network and Supabase Auth settings.")), ms);
+      });
+      return (await Promise.race([promise, timeout])) as T;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
 
   useEffect(() => {
     if (!isBrowserSupabaseConfigured()) {
@@ -37,27 +50,38 @@ export default function AccountPage() {
       setMessage("Supabase public environment variables are missing in this deployment.");
       return;
     }
+    setLoading(true);
 
-    if (mode === "signin") {
-      const { error } = await getBrowserSupabaseClient().auth.signInWithPassword({ email, password });
-      if (error) {
-        setMessage(error.message);
+    try {
+      if (mode === "signin") {
+        const { error } = await withTimeout(
+          getBrowserSupabaseClient().auth.signInWithPassword({ email, password })
+        );
+        if (error) {
+          setMessage(error.message);
+          setLoading(false);
+          return;
+        }
+
+        router.push(nextPath);
+        router.refresh();
         return;
       }
 
-      router.push(nextPath);
-      router.refresh();
-      return;
-    }
+      const { error } = await withTimeout(getBrowserSupabaseClient().auth.signUp({ email, password }));
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
 
-    const { error } = await getBrowserSupabaseClient().auth.signUp({ email, password });
-    if (error) {
-      setMessage(error.message);
-      return;
+      setMessage("Account created. If email confirmation is enabled, confirm your email then sign in.");
+      setMode("signin");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Authentication failed unexpectedly.");
+    } finally {
+      setLoading(false);
     }
-
-    setMessage("Account created. If email confirmation is enabled, confirm your email then sign in.");
-    setMode("signin");
   }
 
   async function onSignOut() {
@@ -65,9 +89,16 @@ export default function AccountPage() {
       setMessage("Supabase public environment variables are missing in this deployment.");
       return;
     }
-    await getBrowserSupabaseClient().auth.signOut();
-    setCurrentUser(null);
-    setMessage("Signed out.");
+    try {
+      setLoading(true);
+      await withTimeout(getBrowserSupabaseClient().auth.signOut());
+      setCurrentUser(null);
+      setMessage("Signed out.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Sign out failed.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -78,11 +109,16 @@ export default function AccountPage() {
           <p className="small">Use this page for sign-in, account creation, and session management.</p>
           <p className="small">Active user: {currentUser ?? "No active session"}</p>
           <div className="actions">
-            <button type="button" className="secondary" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
+            <button
+              type="button"
+              className="secondary"
+              disabled={loading}
+              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+            >
               Switch to {mode === "signin" ? "Sign Up" : "Sign In"}
             </button>
-            <button type="button" className="danger" onClick={onSignOut}>
-              Sign Out
+            <button type="button" className="danger" disabled={loading} onClick={onSignOut}>
+              {loading ? "Working..." : "Sign Out"}
             </button>
           </div>
         </article>
@@ -100,7 +136,9 @@ export default function AccountPage() {
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </label>
             </div>
-            <button type="submit">{mode === "signin" ? "Continue" : "Create Account"}</button>
+            <button type="submit" disabled={loading}>
+              {loading ? "Please wait..." : mode === "signin" ? "Continue" : "Create Account"}
+            </button>
           </form>
           {message && <p className="small">{message}</p>}
         </article>
