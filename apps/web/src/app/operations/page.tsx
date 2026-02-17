@@ -32,9 +32,19 @@ export default function OperationsPage() {
     setError("");
     try {
       const res = await fetch("/api/system/operations", { cache: "no-store" });
-      const body = (await res.json()) as OpResponse & { error?: string };
+      const raw = await res.text();
+      let body: (OpResponse & { error?: string }) | null = null;
+      try {
+        body = raw ? (JSON.parse(raw) as OpResponse & { error?: string }) : null;
+      } catch {
+        body = null;
+      }
       if (!res.ok) {
-        throw new Error(body.error ?? "Unable to load system operations");
+        const detail = body?.error ?? raw?.trim() ?? "Unable to load system operations";
+        throw new Error(detail);
+      }
+      if (!body) {
+        throw new Error("Operations API returned an empty response.");
       }
       setData(body);
     } catch (e) {

@@ -1,11 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
 
 export default function AccountPage() {
-  const router = useRouter();
   const [nextPath, setNextPath] = useState("/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +26,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!isBrowserSupabaseConfigured()) {
-      setMessage("Supabase public environment variables are missing in this deployment.");
+      setMessage("Supabase public environment variables are missing. Restart dev server or redeploy after setting env.");
       return;
     }
 
@@ -47,14 +45,14 @@ export default function AccountPage() {
     event.preventDefault();
     setMessage("");
     if (!isBrowserSupabaseConfigured()) {
-      setMessage("Supabase public environment variables are missing in this deployment.");
+      setMessage("Supabase public environment variables are missing. Restart dev server or redeploy after setting env.");
       return;
     }
     setLoading(true);
 
     try {
       if (mode === "signin") {
-        const { error } = await withTimeout(
+        const { data, error } = await withTimeout(
           getBrowserSupabaseClient().auth.signInWithPassword({ email, password })
         );
         if (error) {
@@ -62,9 +60,14 @@ export default function AccountPage() {
           setLoading(false);
           return;
         }
+        if (!data?.session) {
+          setMessage("Sign-in completed without an active session. Please retry.");
+          setLoading(false);
+          return;
+        }
 
-        router.push(nextPath);
-        router.refresh();
+        setCurrentUser(data.user?.email ?? email);
+        window.location.assign(nextPath);
         return;
       }
 
@@ -86,7 +89,7 @@ export default function AccountPage() {
 
   async function onSignOut() {
     if (!isBrowserSupabaseConfigured()) {
-      setMessage("Supabase public environment variables are missing in this deployment.");
+      setMessage("Supabase public environment variables are missing. Restart dev server or redeploy after setting env.");
       return;
     }
     try {

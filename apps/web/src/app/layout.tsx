@@ -2,11 +2,17 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { Analytics } from "@vercel/analytics/next";
 import { AuthStatus } from "@/components/auth-status";
 
 export const metadata: Metadata = {
   title: "Secure Records Archive",
-  description: "Internal BHT secure archive MVP"
+  description: "Internal BHT secure archive MVP",
+  icons: {
+    icon: "/logo-bytehub.png",
+    shortcut: "/favicon.ico",
+    apple: "/logo-bytehub.png"
+  }
 };
 const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0.0";
 
@@ -111,6 +117,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </footer>
+          <Analytics />
         </div>
       </body>
     </html>

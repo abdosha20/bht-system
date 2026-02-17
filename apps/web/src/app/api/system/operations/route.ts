@@ -64,15 +64,58 @@ async function bucketCheck(): Promise<OpCheck> {
   };
 }
 
+function firstPresent(names: string[]) {
+  for (const name of names) {
+    if (process.env[name]) {
+      return name;
+    }
+  }
+  return null;
+}
+
+function publicSupabaseUrlCheck(): OpCheck {
+  const source = firstPresent(["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL"]);
+  return {
+    id: "env_public_supabase_url",
+    label: "Env public Supabase URL",
+    level: source ? "ok" : "error",
+    detail: source ? `Configured via ${source}` : "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL"
+  };
+}
+
+function publicSupabaseAnonCheck(): OpCheck {
+  const source = firstPresent([
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY"
+  ]);
+  return {
+    id: "env_public_supabase_anon",
+    label: "Env public Supabase anon key",
+    level: source ? "ok" : "error",
+    detail: source
+      ? `Configured via ${source}`
+      : "Missing NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY"
+  };
+}
+
 export async function GET() {
   const now = new Date().toISOString();
   const checks: OpCheck[] = [];
 
-  checks.push(envCheck("NEXT_PUBLIC_SUPABASE_URL"));
-  checks.push(envCheck("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
+  checks.push(publicSupabaseUrlCheck());
+  checks.push(publicSupabaseAnonCheck());
   checks.push(envCheck("SUPABASE_SERVICE_ROLE_KEY"));
   checks.push(envCheck("BHT_BARCODE_SECRET_SALT"));
   checks.push(envCheck("RETENTION_JOB_SECRET"));
+  checks.push({
+    id: "env_vercel_runtime",
+    label: "Runtime environment",
+    level: "ok",
+    detail: process.env.VERCEL_ENV
+      ? `Vercel ${process.env.VERCEL_ENV}`
+      : process.env.NODE_ENV ?? "unknown"
+  });
 
   const service = createServiceClient();
   const { error: healthError } = await service.from("healthcheck_public").select("id,ok").limit(1);

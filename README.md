@@ -13,6 +13,10 @@ Create `apps/web/.env.local` from `apps/web/.env.local.example`:
 - `BHT_BARCODE_SECRET_SALT`
 - `RETENTION_JOB_SECRET`
 
+Fallback variable names are also supported for deployments:
+- `SUPABASE_URL` (fallback for `NEXT_PUBLIC_SUPABASE_URL`)
+- `SUPABASE_ANON_KEY` or `SUPABASE_PUBLISHABLE_KEY` (fallback for `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+
 Never commit real secrets. `apps/web/.env.local` is gitignored.
 
 ## Run migrations
@@ -30,6 +34,7 @@ Option B: Supabase Dashboard SQL editor
    - or from app only: `cd apps/web && npm install`
 2. Start web app:
    - from app directory: `cd apps/web && npm run dev`
+3. If you changed `.env.local` while dev server was already running, restart `next dev` to reload public env values.
 
 ## Security notes
 - UK GDPR by design: data minimisation is enforced by schema and code paths.

@@ -1,11 +1,15 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getPublicSupabaseEnv } from "@/lib/supabase/env";
 
 let browserClient: SupabaseClient | null = null;
-const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const publicAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+function getClientEnv() {
+  return getPublicSupabaseEnv();
+}
 
 export function isBrowserSupabaseConfigured() {
-  return Boolean(publicUrl && publicAnon);
+  const { url, anonKey } = getClientEnv();
+  return Boolean(url && anonKey);
 }
 
 export function getBrowserSupabaseClient() {
@@ -13,11 +17,13 @@ export function getBrowserSupabaseClient() {
     return browserClient;
   }
 
-  if (!publicUrl || !publicAnon) {
+  const { url, anonKey } = getClientEnv();
+
+  if (!url || !anonKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
 
-  browserClient = createClient(publicUrl, publicAnon, {
+  browserClient = createClient(url, anonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true
