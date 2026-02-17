@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Secure Records Archive",
   description: "Internal BHT secure archive MVP"
 };
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0.0";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", mobileLabel: "Home" },
@@ -78,14 +79,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <span className="fIcon email" aria-hidden />
                   info@bytehubtech.co.uk
                 </a>
-                <a href="https://bytehubtech.co.uk/" target="_blank" rel="noreferrer" className="footerLink">
+                <a href="https://bytehubtech.co.uk/" target="_blank" rel="noopener noreferrer" className="footerLink">
                   <span className="fIcon web" aria-hidden />
                   Main Website
                 </a>
                 <a
                   href="https://wa.me/447361542988"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="footerLink"
                 >
                   <span className="fIcon wa" aria-hidden />
@@ -94,7 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a
                   href="https://www.facebook.com/share/1BEDmz4uFN/?mibextid=wwXIfr"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="footerLink"
                 >
                   <span className="fIcon fb" aria-hidden />
@@ -104,6 +105,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="footerMeta small">
                 <div>Support: Mon-Fri, 09:00-18:00 (UK)</div>
                 <div>For urgent incidents, contact WhatsApp support first.</div>
+                <div>
+                  Version {appVersion} | Powered By | BYTE HUB TECHNOLOGY CORPORATE LTD
+                </div>
               </div>
             </div>
           </footer>
