@@ -29,6 +29,30 @@ type UploadResult = {
   error?: string;
 };
 
+async function parseJsonSafe<T>(res: Response): Promise<T | null> {
+  const raw = await res.text();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function authorizedFetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = 45000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await authorizedJsonFetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default function UploadPage() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [barcode, setBarcode] = useState<string>("");
@@ -41,43 +65,75 @@ export default function UploadPage() {
     setLoading(true);
     setResult(null);
     setBarcode("");
+    try {
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const normalizedCustom = customDocType.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+      const effectiveDocType = docType === "CUSTOM" ? normalizedCustom : docType;
 
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const normalizedCustom = customDocType.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
-    const effectiveDocType = docType === "CUSTOM" ? normalizedCustom : docType;
-
-    if (!effectiveDocType) {
-      setLoading(false);
-      setResult({ error: "Please provide a custom document type." });
-      return;
-    }
-
-    data.set("doc_type", effectiveDocType);
-
-    const res = await authorizedJsonFetch("/api/documents/upload", {
-      method: "POST",
-      body: data
-    });
-
-    const body = (await res.json()) as UploadResult;
-    setResult(body);
-
-    if (body.doc_uid) {
-      const gen = await authorizedJsonFetch("/api/barcode/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc_uid: body.doc_uid, version: 1 })
-      });
-
-      if (gen.ok) {
-        const payload = (await gen.json()) as { payload: string };
-        setBarcode(payload.payload);
-        localStorage.setItem("bht_last_barcode", payload.payload);
+      if (!effectiveDocType) {
+        setResult({ error: "Please provide a custom document type." });
+        return;
       }
-    }
 
-    setLoading(false);
+      data.set("doc_type", effectiveDocType);
+
+      const res = await authorizedFetchWithTimeout(
+        "/api/documents/upload",
+        {
+          method: "POST",
+          body: data
+        },
+        60000
+      );
+
+      const body = await parseJsonSafe<UploadResult>(res);
+      if (!res.ok) {
+        setResult({
+          error:
+            body?.error ??
+            `Upload failed (HTTP ${res.status}). Check Vercel Function logs for /api/documents/upload.`
+        });
+        return;
+      }
+
+      if (!body) {
+        setResult({ error: "Upload API returned an empty response." });
+        return;
+      }
+
+      setResult(body);
+
+      if (body.doc_uid) {
+        const gen = await authorizedFetchWithTimeout(
+          "/api/barcode/generate",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ doc_uid: body.doc_uid, version: 1 })
+          },
+          30000
+        );
+
+        if (gen.ok) {
+          const payload = await parseJsonSafe<{ payload: string }>(gen);
+          if (payload?.payload) {
+            setBarcode(payload.payload);
+            localStorage.setItem("bht_last_barcode", payload.payload);
+          }
+        }
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error && error.name === "AbortError"
+          ? "Upload timed out. Check Vercel function duration and logs."
+          : error instanceof Error
+            ? error.message
+            : "Upload failed unexpectedly.";
+      setResult({ error: message });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function copy(text: string) {
