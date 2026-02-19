@@ -21,12 +21,22 @@ const DOC_TYPE_OPTIONS = [
   "TAX",
   "CUSTOM"
 ] as const;
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 type UploadResult = {
   ok?: boolean;
   doc_uid?: string;
   storage_path?: string;
+  error?: string;
+};
+
+type UploadInitResult = {
+  ok?: boolean;
+  doc_uid?: string;
+  storage_path?: string;
+  upload_token?: string;
+  finalize_token?: string;
+  expires_at?: number;
   error?: string;
 };
 
@@ -78,48 +88,94 @@ export default function UploadPage() {
       }
 
       const selectedFile = data.get("file");
-      if (selectedFile instanceof File && selectedFile.size > MAX_UPLOAD_BYTES) {
+      if (!(selectedFile instanceof File)) {
+        setResult({ error: "Please choose a PDF file." });
+        return;
+      }
+      if (selectedFile.type !== "application/pdf") {
+        setResult({ error: "Only PDF uploads are allowed." });
+        return;
+      }
+      if (selectedFile.size > MAX_UPLOAD_BYTES) {
         setResult({
-          error: "File too large for current deployment limit (about 4MB on Vercel). Please upload a smaller PDF."
+          error: "File too large. Current app limit is 25MB."
         });
         return;
       }
 
-      data.set("doc_type", effectiveDocType);
-
-      const res = await authorizedFetchWithTimeout(
-        "/api/documents/upload",
+      const initRes = await authorizedFetchWithTimeout(
+        "/api/documents/upload-init",
         {
           method: "POST",
-          body: data
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: String(data.get("title") ?? ""),
+            doc_type: effectiveDocType,
+            version: Number.parseInt(String(data.get("version") ?? "1"), 10),
+            file_size: selectedFile.size,
+            mime_type: selectedFile.type
+          })
         },
-        60000
+        30000
       );
 
-      const body = await parseJsonSafe<UploadResult>(res);
-      if (!res.ok) {
+      const initBody = await parseJsonSafe<UploadInitResult>(initRes);
+      if (!initRes.ok) {
         setResult({
           error:
-            body?.error ??
-            `Upload failed (HTTP ${res.status}). Check Vercel Function logs for /api/documents/upload.`
+            initBody?.error ??
+            `Upload initialization failed (HTTP ${initRes.status}). Check Vercel logs for /api/documents/upload-init.`
+        });
+        return;
+      }
+      if (!initBody?.doc_uid || !initBody.storage_path || !initBody.upload_token || !initBody.finalize_token) {
+        setResult({ error: "Upload initialization returned incomplete data." });
+        return;
+      }
+
+      const direct = await getBrowserSupabaseClient()
+        .storage.from("records-private")
+        .uploadToSignedUrl(initBody.storage_path, initBody.upload_token, selectedFile, {
+          contentType: selectedFile.type,
+          upsert: false
+        });
+      if (direct.error) {
+        setResult({ error: `Direct upload failed: ${direct.error.message}` });
+        return;
+      }
+
+      const finalizeRes = await authorizedFetchWithTimeout(
+        "/api/documents/upload-complete",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            doc_uid: initBody.doc_uid,
+            storage_path: initBody.storage_path,
+            finalize_token: initBody.finalize_token
+          })
+        },
+        30000
+      );
+      const finalizeBody = await parseJsonSafe<UploadResult>(finalizeRes);
+      if (!finalizeRes.ok || !finalizeBody) {
+        setResult({
+          error:
+            finalizeBody?.error ??
+            `Upload finalize failed (HTTP ${finalizeRes.status}). Check Vercel logs for /api/documents/upload-complete.`
         });
         return;
       }
 
-      if (!body) {
-        setResult({ error: "Upload API returned an empty response." });
-        return;
-      }
+      setResult(finalizeBody);
 
-      setResult(body);
-
-      if (body.doc_uid) {
+      if (finalizeBody.doc_uid) {
         const gen = await authorizedFetchWithTimeout(
           "/api/barcode/generate",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ doc_uid: body.doc_uid, version: 1 })
+            body: JSON.stringify({ doc_uid: finalizeBody.doc_uid, version: 1 })
           },
           30000
         );
