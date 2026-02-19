@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -30,8 +31,15 @@ export async function POST(req: Request) {
     if (!(file instanceof File) || file.type !== "application/pdf") {
       return NextResponse.json({ error: "Only PDF uploads are allowed" }, { status: 400 });
     }
-    if (file.size > 20 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large. Max upload size is 20MB." }, { status: 413 });
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        {
+          error:
+            "File too large for this deployment. Vercel serverless uploads are limited to about 4MB per request.",
+          max_bytes: MAX_UPLOAD_BYTES
+        },
+        { status: 413 }
+      );
     }
     if (!docType) {
       return NextResponse.json({ error: "Invalid document type" }, { status: 400 });

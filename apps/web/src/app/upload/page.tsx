@@ -21,6 +21,7 @@ const DOC_TYPE_OPTIONS = [
   "TAX",
   "CUSTOM"
 ] as const;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 type UploadResult = {
   ok?: boolean;
@@ -73,6 +74,14 @@ export default function UploadPage() {
 
       if (!effectiveDocType) {
         setResult({ error: "Please provide a custom document type." });
+        return;
+      }
+
+      const selectedFile = data.get("file");
+      if (selectedFile instanceof File && selectedFile.size > MAX_UPLOAD_BYTES) {
+        setResult({
+          error: "File too large for current deployment limit (about 4MB on Vercel). Please upload a smaller PDF."
+        });
         return;
       }
 
