@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
 
-type Props = {
-  lang: "en" | "ar";
-};
-
-export function AuthStatus({ lang }: Props) {
+export function AuthStatus() {
   const [email, setEmail] = useState<string | null>(null);
   const [misconfigured, setMisconfigured] = useState(false);
 
@@ -36,20 +32,10 @@ export function AuthStatus({ lang }: Props) {
   return (
     <div className="authBadge">
       <span className="small">
-        {misconfigured
-          ? lang === "ar"
-            ? "متغيرات Supabase العامة مفقودة"
-            : "Supabase public env missing"
-          : email
-            ? lang === "ar"
-              ? `تم تسجيل الدخول: ${email}`
-              : `Signed in: ${email}`
-            : lang === "ar"
-              ? "غير مسجل الدخول"
-              : "Not signed in"}
+        {misconfigured ? "Supabase public env missing" : email ? `Signed in: ${email}` : "Not signed in"}
       </span>
       <Link href={email ? "/account" : "/account?next=/dashboard"} className="navLink">
-        {email ? (lang === "ar" ? "الحساب" : "Account") : lang === "ar" ? "تسجيل الدخول" : "Sign In"}
+        {email ? "Account" : "Sign In"}
       </Link>
     </div>
   );

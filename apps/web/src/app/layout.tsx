@@ -4,8 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Analytics } from "@vercel/analytics/next";
 import { AuthStatus } from "@/components/auth-status";
-import { LanguageToggle } from "@/components/language-toggle";
-import { dirForLang, getServerLang } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Secure Records Archive",
@@ -18,69 +16,21 @@ export const metadata: Metadata = {
 };
 const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0.0";
 
-const nav = {
-  en: [
-    { href: "/dashboard", label: "Dashboard", mobileLabel: "Home" },
-    { href: "/records", label: "Records", mobileLabel: "Records" },
-    { href: "/data-protection", label: "Data Protection", mobileLabel: "Data" },
-    { href: "/operations", label: "Operations", mobileLabel: "Ops" },
-    { href: "/upload", label: "Upload", mobileLabel: "Upload" },
-    { href: "/resolve", label: "Resolve", mobileLabel: "Resolve" },
-    { href: "/search", label: "Search", mobileLabel: "Search" },
-    { href: "/audit", label: "Audit", mobileLabel: "Audit" },
-    { href: "/setup", label: "Setup", mobileLabel: "Setup" }
-  ],
-  ar: [
-    { href: "/dashboard", label: "لوحة التحكم", mobileLabel: "الرئيسية" },
-    { href: "/records", label: "السجلات", mobileLabel: "السجلات" },
-    { href: "/data-protection", label: "حماية البيانات", mobileLabel: "البيانات" },
-    { href: "/operations", label: "العمليات", mobileLabel: "العمليات" },
-    { href: "/upload", label: "رفع", mobileLabel: "رفع" },
-    { href: "/resolve", label: "تحليل الرمز", mobileLabel: "تحليل" },
-    { href: "/search", label: "بحث", mobileLabel: "بحث" },
-    { href: "/audit", label: "التدقيق", mobileLabel: "تدقيق" },
-    { href: "/setup", label: "الإعداد", mobileLabel: "إعداد" }
-  ]
-} as const;
+const nav = [
+  { href: "/dashboard", label: "Dashboard", mobileLabel: "Home" },
+  { href: "/records", label: "Records", mobileLabel: "Records" },
+  { href: "/data-protection", label: "Data Protection", mobileLabel: "Data" },
+  { href: "/operations", label: "Operations", mobileLabel: "Ops" },
+  { href: "/upload", label: "Upload", mobileLabel: "Upload" },
+  { href: "/resolve", label: "Resolve", mobileLabel: "Resolve" },
+  { href: "/search", label: "Search", mobileLabel: "Search" },
+  { href: "/audit", label: "Audit", mobileLabel: "Audit" },
+  { href: "/setup", label: "Setup", mobileLabel: "Setup" }
+];
 
-const copy = {
-  en: {
-    brand: "BHT Secure Records Archive",
-    strap: "Internal records handling, retention, and audit trail",
-    navigation: "Navigation",
-    mobileNav: "Mobile navigation",
-    footerTitle: "BHT Secure Records Archive",
-    footerDesc: "Security-first internal archive with audit, retention, and controlled access.",
-    website: "Main Website",
-    whatsapp: "WhatsApp Support",
-    facebook: "Facebook Page",
-    supportHours: "Support: Mon-Fri, 09:00-18:00 (UK)",
-    supportHint: "For urgent incidents, contact WhatsApp support first.",
-    versionBy: "Powered By | BYTE HUB TECHNOLOGY CORPORATE LTD"
-  },
-  ar: {
-    brand: "أرشيف BHT الآمن للسجلات",
-    strap: "إدارة السجلات الداخلية والحفظ ومسار التدقيق",
-    navigation: "التنقل",
-    mobileNav: "تنقل الجوال",
-    footerTitle: "أرشيف BHT الآمن للسجلات",
-    footerDesc: "أرشيف داخلي آمن مع تدقيق وحفظ وصول مضبوط.",
-    website: "الموقع الرئيسي",
-    whatsapp: "دعم واتساب",
-    facebook: "صفحة فيسبوك",
-    supportHours: "الدعم: الإثنين-الجمعة، 09:00-18:00 (المملكة المتحدة)",
-    supportHint: "للحوادث العاجلة، تواصل أولاً عبر واتساب.",
-    versionBy: "مشغل بواسطة | BYTE HUB TECHNOLOGY CORPORATE LTD"
-  }
-} as const;
-
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const lang = await getServerLang();
-  const t = copy[lang];
-  const navItems = nav[lang];
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang={lang} dir={dirForLang(lang)}>
+    <html lang="en">
       <body>
         <div className="shell">
           <header className="topbar">
@@ -88,21 +38,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="brandWrap">
                 <div className="brandLine">
                   <Image src="/logo-bytehub.png" alt="BYTE HUB logo" width={120} height={52} className="brandLogo" />
-                  <div className="brand">{t.brand}</div>
+                  <div className="brand">BHT Secure Records Archive</div>
                 </div>
-                <div className="small">{t.strap}</div>
+                <div className="small">Internal records handling, retention, and audit trail</div>
               </div>
-              <div className="actions">
-                <LanguageToggle lang={lang} />
-                <AuthStatus lang={lang} />
-              </div>
+              <AuthStatus />
             </div>
           </header>
           <div className="workspace">
             <aside className="sideNav">
-              <div className="sideTitle">{t.navigation}</div>
+              <div className="sideTitle">Navigation</div>
               <nav className="sideNavList">
-                {navItems.map((item) => (
+                {nav.map((item) => (
                   <Link key={item.href} href={item.href} className="sideNavLink">
                     {item.label}
                   </Link>
@@ -111,8 +58,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </aside>
             <main className="main">{children}</main>
           </div>
-          <nav className="mobileTabs" aria-label={t.mobileNav}>
-            {navItems.map((item) => (
+          <nav className="mobileTabs" aria-label="Mobile navigation">
+            {nav.map((item) => (
               <Link key={item.href} href={item.href} className="mobileTabLink">
                 {item.mobileLabel}
               </Link>
@@ -125,8 +72,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="footerBrand">
                 <Image src="/logo-bytehub.png" alt="BYTE HUB logo" width={72} height={72} className="footerLogo" />
                 <div>
-                  <div className="footerTitle">{t.footerTitle}</div>
-                  <div className="small">{t.footerDesc}</div>
+                  <div className="footerTitle">BHT Secure Records Archive</div>
+                  <div className="small">Security-first internal archive with audit, retention, and controlled access.</div>
                 </div>
               </div>
               <div className="footerLinks">
@@ -140,7 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </a>
                 <a href="https://bytehubtech.co.uk/" target="_blank" rel="noopener noreferrer" className="footerLink">
                   <span className="fIcon web" aria-hidden />
-                  {t.website}
+                  Main Website
                 </a>
                 <a
                   href="https://wa.me/447361542988"
@@ -149,7 +96,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   className="footerLink"
                 >
                   <span className="fIcon wa" aria-hidden />
-                  {t.whatsapp}
+                  WhatsApp Support
                 </a>
                 <a
                   href="https://www.facebook.com/share/1BEDmz4uFN/?mibextid=wwXIfr"
@@ -158,14 +105,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   className="footerLink"
                 >
                   <span className="fIcon fb" aria-hidden />
-                  {t.facebook}
+                  Facebook Page
                 </a>
               </div>
               <div className="footerMeta small">
-                <div>{t.supportHours}</div>
-                <div>{t.supportHint}</div>
+                <div>Support: Mon-Fri, 09:00-18:00 (UK)</div>
+                <div>For urgent incidents, contact WhatsApp support first.</div>
                 <div>
-                  Version {appVersion} | {t.versionBy}
+                  Version {appVersion} | Powered By | BYTE HUB TECHNOLOGY CORPORATE LTD
                 </div>
               </div>
             </div>
