@@ -26,7 +26,67 @@ declare global {
 
 const HCAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
 
+const copy = {
+  en: {
+    envMissing: "Supabase public environment variables are missing. Restart dev server or redeploy after setting env.",
+    timeout: "Request timed out. Check network and Supabase Auth settings.",
+    captchaExpired: "Captcha expired. Please complete it again.",
+    captchaTimedOut: "Captcha challenge timed out. Please try again.",
+    captchaHostError: (host: string) => `hCaptcha widget failed for host "${host}". Add this hostname in hCaptcha settings.`,
+    captchaBeforeContinue: "Complete the captcha challenge before continuing.",
+    signinNoSession: "Sign-in completed without an active session. Please retry.",
+    captchaBeforeSignup: "Complete the captcha challenge before creating an account.",
+    signupFailed: "Signup failed.",
+    signupDone: "Account created. If email confirmation is enabled, confirm your email then sign in.",
+    authUnexpected: "Authentication failed unexpectedly.",
+    signoutFailed: "Sign out failed.",
+    signedOut: "Signed out.",
+    title: "Account Access",
+    subtitle: "Use this page for sign-in, account creation, and session management.",
+    activeUser: "Active user",
+    noSession: "No active session",
+    switchTo: (mode: "signin" | "signup") => `Switch to ${mode === "signin" ? "Sign Up" : "Sign In"}`,
+    signOut: "Sign Out",
+    working: "Working...",
+    signin: "Sign In",
+    create: "Create Account",
+    email: "Email",
+    password: "Password",
+    wait: "Please wait...",
+    continue: "Continue"
+  },
+  ar: {
+    envMissing: "متغيرات Supabase العامة مفقودة. أعد تشغيل الخادم بعد ضبط المتغيرات.",
+    timeout: "انتهت مهلة الطلب. تحقق من الشبكة وإعدادات Supabase Auth.",
+    captchaExpired: "انتهت صلاحية التحقق. أكمل التحقق مرة أخرى.",
+    captchaTimedOut: "انتهت مهلة تحدي التحقق. حاول مرة أخرى.",
+    captchaHostError: (host: string) => `فشل hCaptcha على النطاق "${host}". أضف هذا النطاق في إعدادات hCaptcha.`,
+    captchaBeforeContinue: "أكمل التحقق قبل المتابعة.",
+    signinNoSession: "تم تسجيل الدخول بدون جلسة نشطة. يرجى المحاولة مرة أخرى.",
+    captchaBeforeSignup: "أكمل التحقق قبل إنشاء الحساب.",
+    signupFailed: "فشل إنشاء الحساب.",
+    signupDone: "تم إنشاء الحساب. إذا كان تأكيد البريد مفعلاً فقم بالتأكيد ثم سجل الدخول.",
+    authUnexpected: "فشل المصادقة بشكل غير متوقع.",
+    signoutFailed: "فشل تسجيل الخروج.",
+    signedOut: "تم تسجيل الخروج.",
+    title: "الوصول إلى الحساب",
+    subtitle: "استخدم هذه الصفحة لتسجيل الدخول وإنشاء الحساب وإدارة الجلسة.",
+    activeUser: "المستخدم الحالي",
+    noSession: "لا توجد جلسة نشطة",
+    switchTo: (mode: "signin" | "signup") => `التحويل إلى ${mode === "signin" ? "إنشاء حساب" : "تسجيل الدخول"}`,
+    signOut: "تسجيل الخروج",
+    working: "جارٍ التنفيذ...",
+    signin: "تسجيل الدخول",
+    create: "إنشاء حساب",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    wait: "يرجى الانتظار...",
+    continue: "متابعة"
+  }
+} as const;
+
 export default function AccountPage() {
+  const [lang, setLang] = useState<"en" | "ar">("en");
   const [nextPath, setNextPath] = useState("/dashboard");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,12 +99,13 @@ export default function AccountPage() {
   const [captchaSize, setCaptchaSize] = useState<"normal" | "compact">("normal");
   const captchaContainerRef = useRef<HTMLDivElement | null>(null);
   const captchaWidgetRef = useRef<string | number | null>(null);
+  const t = copy[lang];
 
   async function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | null = null;
     try {
       const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Request timed out. Check network and Supabase Auth settings.")), ms);
+        timer = setTimeout(() => reject(new Error(t.timeout)), ms);
       });
       return (await Promise.race([promise, timeout])) as T;
     } finally {
@@ -53,8 +114,12 @@ export default function AccountPage() {
   }
 
   useEffect(() => {
+    setLang(document.documentElement.lang === "ar" ? "ar" : "en");
+  }, []);
+
+  useEffect(() => {
     if (!isBrowserSupabaseConfigured()) {
-      setMessage("Supabase public environment variables are missing. Restart dev server or redeploy after setting env.");
+      setMessage(t.envMissing);
       return;
     }
 
@@ -67,7 +132,7 @@ export default function AccountPage() {
       .auth.getUser()
       .then(({ data }) => setCurrentUser(data.user?.email ?? null))
       .catch(() => setCurrentUser(null));
-  }, []);
+  }, [t.envMissing]);
 
   useEffect(() => {
     const updateCaptchaSize = () => {
@@ -101,33 +166,31 @@ export default function AccountPage() {
       },
       "expired-callback": () => {
         setCaptchaToken("");
-        setMessage("Captcha expired. Please complete it again.");
+        setMessage(t.captchaExpired);
       },
       "chalexpired-callback": () => {
         setCaptchaToken("");
-        setMessage("Captcha challenge timed out. Please try again.");
+        setMessage(t.captchaTimedOut);
       },
       "error-callback": () => {
         setCaptchaToken("");
-        setMessage(
-          `hCaptcha widget failed for host "${window.location.hostname}". Add this hostname in hCaptcha settings.`
-        );
+        setMessage(t.captchaHostError(window.location.hostname));
       }
     });
-  }, [captchaReady, captchaSize]);
+  }, [captchaReady, captchaSize, t]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
     if (!isBrowserSupabaseConfigured()) {
-      setMessage("Supabase public environment variables are missing. Restart dev server or redeploy after setting env.");
+      setMessage(t.envMissing);
       return;
     }
     setLoading(true);
 
     try {
       if (HCAPTCHA_SITE_KEY && !captchaToken) {
-        setMessage("Complete the captcha challenge before continuing.");
+        setMessage(t.captchaBeforeContinue);
         setLoading(false);
         return;
       }
@@ -152,7 +215,7 @@ export default function AccountPage() {
           return;
         }
         if (!data?.session) {
-          setMessage("Sign-in completed without an active session. Please retry.");
+          setMessage(t.signinNoSession);
           setLoading(false);
           return;
         }
@@ -163,7 +226,7 @@ export default function AccountPage() {
       }
 
       if (!captchaToken) {
-        setMessage("Complete the captcha challenge before creating an account.");
+        setMessage(t.captchaBeforeSignup);
         setLoading(false);
         return;
       }
@@ -186,7 +249,7 @@ export default function AccountPage() {
         setCaptchaToken("");
         const codes = payload?.codes?.length ? ` (${payload.codes.join(", ")})` : "";
         const hints = payload?.hints?.length ? ` ${payload.hints.join(" ")}` : "";
-        setMessage(`${payload?.error ?? "Signup failed."}${codes}${hints}`);
+        setMessage(`${payload?.error ?? t.signupFailed}${codes}${hints}`);
         setLoading(false);
         return;
       }
@@ -195,10 +258,10 @@ export default function AccountPage() {
         window.hcaptcha.reset(captchaWidgetRef.current);
       }
       setCaptchaToken("");
-      setMessage("Account created. If email confirmation is enabled, confirm your email then sign in.");
+      setMessage(t.signupDone);
       setMode("signin");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Authentication failed unexpectedly.");
+      setMessage(e instanceof Error ? e.message : t.authUnexpected);
     } finally {
       setLoading(false);
     }
@@ -206,16 +269,16 @@ export default function AccountPage() {
 
   async function onSignOut() {
     if (!isBrowserSupabaseConfigured()) {
-      setMessage("Supabase public environment variables are missing. Restart dev server or redeploy after setting env.");
+      setMessage(t.envMissing);
       return;
     }
     try {
       setLoading(true);
       await withTimeout(getBrowserSupabaseClient().auth.signOut());
       setCurrentUser(null);
-      setMessage("Signed out.");
+      setMessage(t.signedOut);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Sign out failed.");
+      setMessage(e instanceof Error ? e.message : t.signoutFailed);
     } finally {
       setLoading(false);
     }
@@ -225,9 +288,11 @@ export default function AccountPage() {
     <section className="card">
       <div className="split2">
         <article className="card">
-          <h1>Account Access</h1>
-          <p className="small">Use this page for sign-in, account creation, and session management.</p>
-          <p className="small">Active user: {currentUser ?? "No active session"}</p>
+          <h1>{t.title}</h1>
+          <p className="small">{t.subtitle}</p>
+          <p className="small">
+            {t.activeUser}: {currentUser ?? t.noSession}
+          </p>
           <div className="actions">
             <button
               type="button"
@@ -235,16 +300,16 @@ export default function AccountPage() {
               disabled={loading}
               onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
             >
-              Switch to {mode === "signin" ? "Sign Up" : "Sign In"}
+              {t.switchTo(mode)}
             </button>
             <button type="button" className="danger" disabled={loading} onClick={onSignOut}>
-              {loading ? "Working..." : "Sign Out"}
+              {loading ? t.working : t.signOut}
             </button>
           </div>
         </article>
 
         <article className="card">
-          <h2>{mode === "signin" ? "Sign In" : "Create Account"}</h2>
+          <h2>{mode === "signin" ? t.signin : t.create}</h2>
           {HCAPTCHA_SITE_KEY && (
             <Script
               src="https://js.hcaptcha.com/1/api.js?render=explicit&recaptchacompat=off"
@@ -256,11 +321,11 @@ export default function AccountPage() {
           <form onSubmit={onSubmit}>
             <div className="formGrid">
               <label>
-                Email
+                {t.email}
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </label>
               <label>
-                Password
+                {t.password}
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </label>
             </div>
@@ -270,7 +335,7 @@ export default function AccountPage() {
               </div>
             )}
             <button type="submit" disabled={loading}>
-              {loading ? "Please wait..." : mode === "signin" ? "Continue" : "Create Account"}
+              {loading ? t.wait : mode === "signin" ? t.continue : t.create}
             </button>
           </form>
           {message && <p className="small">{message}</p>}
