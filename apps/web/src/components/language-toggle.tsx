@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 type Props = {
@@ -16,8 +15,8 @@ export function LanguageToggle({ lang }: Props) {
   const href = `/api/i18n?lang=${targetLang}&returnTo=${encodeURIComponent(current)}`;
 
   return (
-    <Link href={href} className="navLink" prefetch={false}>
+    <a href={href} className="navLink">
       {label}
-    </Link>
+    </a>
   );
 }
