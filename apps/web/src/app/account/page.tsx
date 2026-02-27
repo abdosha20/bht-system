@@ -246,7 +246,12 @@ export default function AccountPage() {
         <article className="card">
           <h2>{mode === "signin" ? "Sign In" : "Create Account"}</h2>
           {HCAPTCHA_SITE_KEY && (
-            <Script src="https://js.hcaptcha.com/1/api.js" async defer onReady={() => setCaptchaReady(true)} />
+            <Script
+              src="https://js.hcaptcha.com/1/api.js?render=explicit&recaptchacompat=off"
+              async
+              defer
+              onReady={() => setCaptchaReady(true)}
+            />
           )}
           <form onSubmit={onSubmit}>
             <div className="formGrid">
@@ -261,7 +266,7 @@ export default function AccountPage() {
             </div>
             {HCAPTCHA_SITE_KEY && (
               <div className="hCaptchaWrap">
-                <div ref={captchaContainerRef} className="h-captcha" />
+                <div ref={captchaContainerRef} className="hcaptchaContainer" />
               </div>
             )}
             <button type="submit" disabled={loading}>
