@@ -6,6 +6,7 @@ import { createAnonServerClient } from "@/lib/supabase/server";
 type VerifyCaptchaResult = {
   success: boolean;
   "error-codes"?: string[];
+  hostname?: string;
 };
 
 function getRequiredEnv(name: string) {
@@ -35,13 +36,15 @@ export async function POST(req: Request) {
     }
 
     const captchaSecret = getRequiredEnv("HCAPTCHA_SECRET_KEY");
-    const captchaSiteKey = getRequiredEnv("NEXT_PUBLIC_HCAPTCHA_SITE_KEY");
+    const captchaSiteKey = process.env.HCAPTCHA_SITE_KEY ?? process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
 
     const verifyBody = new URLSearchParams({
       secret: captchaSecret,
-      response: captchaToken,
-      sitekey: captchaSiteKey
+      response: captchaToken
     });
+    if (captchaSiteKey) {
+      verifyBody.set("sitekey", captchaSiteKey);
+    }
     const remoteIp = getRemoteIp(req);
     if (remoteIp) {
       verifyBody.set("remoteip", remoteIp);
@@ -54,15 +57,24 @@ export async function POST(req: Request) {
     });
 
     if (!verifyResponse.ok) {
-      return NextResponse.json({ error: "Captcha verification failed." }, { status: 502 });
+      const raw = await verifyResponse.text().catch(() => "");
+      return NextResponse.json(
+        {
+          error: "Captcha verification endpoint failed.",
+          provider_status: verifyResponse.status,
+          provider_body: raw.slice(0, 300)
+        },
+        { status: 502 }
+      );
     }
 
     const verifyResult = (await verifyResponse.json()) as VerifyCaptchaResult;
     if (!verifyResult.success) {
+      const codes = verifyResult["error-codes"] ?? [];
       return NextResponse.json(
         {
-          error: "Captcha challenge failed. Please try again.",
-          codes: verifyResult["error-codes"] ?? []
+          error: `Captcha challenge failed: ${codes.join(", ") || "unknown_error"}.`,
+          codes
         },
         { status: 400 }
       );

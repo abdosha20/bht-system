@@ -141,10 +141,13 @@ export default function AccountPage() {
           body: JSON.stringify({ email, password, captchaToken })
         })
       );
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; codes?: string[] }
+        | null;
 
       if (!response.ok) {
-        setMessage(payload?.error ?? "Signup failed.");
+        const codes = payload?.codes?.length ? ` (${payload.codes.join(", ")})` : "";
+        setMessage(`${payload?.error ?? "Signup failed."}${codes}`);
         setLoading(false);
         return;
       }
