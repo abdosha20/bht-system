@@ -430,6 +430,11 @@ button.danger {
   font-size: 0.88rem;
 }
 
+.hCaptchaWrap {
+  margin: 0.35rem 0 0.75rem;
+  overflow-x: auto;
+}
+
 .muted {
   color: var(--muted);
 }

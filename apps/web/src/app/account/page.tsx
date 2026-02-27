@@ -6,6 +6,7 @@ import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/sup
 
 type HCaptchaRenderOptions = {
   sitekey: string;
+  size?: "normal" | "compact" | "invisible";
   callback: (token: string) => void;
   "expired-callback"?: () => void;
   "error-callback"?: () => void;
@@ -35,6 +36,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaReady, setCaptchaReady] = useState(false);
+  const [captchaSize, setCaptchaSize] = useState<"normal" | "compact">("normal");
   const captchaContainerRef = useRef<HTMLDivElement | null>(null);
   const captchaWidgetRef = useRef<string | number | null>(null);
 
@@ -68,6 +70,15 @@ export default function AccountPage() {
   }, []);
 
   useEffect(() => {
+    const updateCaptchaSize = () => {
+      setCaptchaSize(window.innerWidth <= 420 ? "compact" : "normal");
+    };
+    updateCaptchaSize();
+    window.addEventListener("resize", updateCaptchaSize);
+    return () => window.removeEventListener("resize", updateCaptchaSize);
+  }, []);
+
+  useEffect(() => {
     if (!HCAPTCHA_SITE_KEY) {
       return;
     }
@@ -76,12 +87,14 @@ export default function AccountPage() {
     }
 
     if (captchaWidgetRef.current !== null) {
-      window.hcaptcha.reset(captchaWidgetRef.current);
-      return;
+      // Re-render when size changes so mobile gets compact widget.
+      captchaContainerRef.current.innerHTML = "";
+      captchaWidgetRef.current = null;
     }
 
     captchaWidgetRef.current = window.hcaptcha.render(captchaContainerRef.current, {
       sitekey: HCAPTCHA_SITE_KEY,
+      size: captchaSize,
       callback: (token: string) => {
         setCaptchaToken(token);
         setMessage("");
@@ -101,7 +114,7 @@ export default function AccountPage() {
         );
       }
     });
-  }, [captchaReady]);
+  }, [captchaReady, captchaSize]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -246,7 +259,11 @@ export default function AccountPage() {
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </label>
             </div>
-            {HCAPTCHA_SITE_KEY && <div ref={captchaContainerRef} className="h-captcha" />}
+            {HCAPTCHA_SITE_KEY && (
+              <div className="hCaptchaWrap">
+                <div ref={captchaContainerRef} className="h-captcha" />
+              </div>
+            )}
             <button type="submit" disabled={loading}>
               {loading ? "Please wait..." : mode === "signin" ? "Continue" : "Create Account"}
             </button>
