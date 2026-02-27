@@ -9,16 +9,25 @@ type VerifyCaptchaResult = {
   hostname?: string;
 };
 
+const HCAPTCHA_CODE_HINTS: Record<string, string> = {
+  "missing-input-secret": "Missing HCAPTCHA_SECRET_KEY on the server.",
+  "invalid-input-secret": "HCAPTCHA_SECRET_KEY is invalid. Rotate and update env values.",
+  "missing-input-response": "Captcha token is missing from the request.",
+  "invalid-input-response": "Captcha token is invalid. Solve a fresh challenge and retry.",
+  "expired-input-response": "Captcha token expired. Solve a fresh challenge and retry.",
+  "already-seen-response": "Captcha token was already used. Solve a fresh challenge and retry.",
+  "invalid-or-already-seen-response": "Captcha token is invalid or already used. Solve a fresh challenge and retry.",
+  "sitekey-secret-mismatch":
+    "Site key and secret key do not belong to the same hCaptcha site. Verify both env values.",
+  "not-using-dummy-passcode": "Dummy/test keys are configured incorrectly for this environment."
+};
+
 function getRequiredEnv(name: string) {
   const value = process.env[name];
   if (!value) {
     throw new Error(`Missing environment variable: ${name}`);
   }
   return value;
-}
-
-function getRemoteIp(req: Request) {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
 }
 
 export async function POST(req: Request) {
@@ -45,10 +54,6 @@ export async function POST(req: Request) {
     if (captchaSiteKey) {
       verifyBody.set("sitekey", captchaSiteKey);
     }
-    const remoteIp = getRemoteIp(req);
-    if (remoteIp) {
-      verifyBody.set("remoteip", remoteIp);
-    }
 
     const verifyResponse = await fetch("https://api.hcaptcha.com/siteverify", {
       method: "POST",
@@ -71,17 +76,24 @@ export async function POST(req: Request) {
     const verifyResult = (await verifyResponse.json()) as VerifyCaptchaResult;
     if (!verifyResult.success) {
       const codes = verifyResult["error-codes"] ?? [];
+      const hints = codes.map((code) => HCAPTCHA_CODE_HINTS[code]).filter(Boolean);
       return NextResponse.json(
         {
           error: `Captcha challenge failed: ${codes.join(", ") || "unknown_error"}.`,
-          codes
+          codes,
+          hints,
+          hostname: verifyResult.hostname ?? null
         },
         { status: 400 }
       );
     }
 
     const client = createAnonServerClient();
-    const { data, error } = await client.auth.signUp({ email, password });
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: { captchaToken }
+    });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

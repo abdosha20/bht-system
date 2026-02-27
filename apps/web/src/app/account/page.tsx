@@ -9,6 +9,7 @@ type HCaptchaRenderOptions = {
   callback: (token: string) => void;
   "expired-callback"?: () => void;
   "error-callback"?: () => void;
+  "chalexpired-callback"?: () => void;
 };
 
 type HCaptchaApi = {
@@ -67,18 +68,7 @@ export default function AccountPage() {
   }, []);
 
   useEffect(() => {
-    if (mode === "signup" && window.hcaptcha) {
-      setCaptchaReady(true);
-    }
-  }, [mode]);
-
-  useEffect(() => {
-    if (mode !== "signup") {
-      setCaptchaToken("");
-      return;
-    }
     if (!HCAPTCHA_SITE_KEY) {
-      setMessage("Missing NEXT_PUBLIC_HCAPTCHA_SITE_KEY. Set env and restart.");
       return;
     }
     if (!captchaReady || !window.hcaptcha || !captchaContainerRef.current) {
@@ -92,11 +82,26 @@ export default function AccountPage() {
 
     captchaWidgetRef.current = window.hcaptcha.render(captchaContainerRef.current, {
       sitekey: HCAPTCHA_SITE_KEY,
-      callback: (token: string) => setCaptchaToken(token),
-      "expired-callback": () => setCaptchaToken(""),
-      "error-callback": () => setCaptchaToken("")
+      callback: (token: string) => {
+        setCaptchaToken(token);
+        setMessage("");
+      },
+      "expired-callback": () => {
+        setCaptchaToken("");
+        setMessage("Captcha expired. Please complete it again.");
+      },
+      "chalexpired-callback": () => {
+        setCaptchaToken("");
+        setMessage("Captcha challenge timed out. Please try again.");
+      },
+      "error-callback": () => {
+        setCaptchaToken("");
+        setMessage(
+          `hCaptcha widget failed for host "${window.location.hostname}". Add this hostname in hCaptcha settings.`
+        );
+      }
     });
-  }, [captchaReady, mode]);
+  }, [captchaReady]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,11 +113,27 @@ export default function AccountPage() {
     setLoading(true);
 
     try {
+      if (HCAPTCHA_SITE_KEY && !captchaToken) {
+        setMessage("Complete the captcha challenge before continuing.");
+        setLoading(false);
+        return;
+      }
+
       if (mode === "signin") {
         const { data, error } = await withTimeout(
-          getBrowserSupabaseClient().auth.signInWithPassword({ email, password })
+          getBrowserSupabaseClient().auth.signInWithPassword({
+            email,
+            password,
+            options: {
+              captchaToken: captchaToken || undefined
+            }
+          })
         );
         if (error) {
+          if (window.hcaptcha && captchaWidgetRef.current !== null) {
+            window.hcaptcha.reset(captchaWidgetRef.current);
+          }
+          setCaptchaToken("");
           setMessage(error.message);
           setLoading(false);
           return;
@@ -142,12 +163,17 @@ export default function AccountPage() {
         })
       );
       const payload = (await response.json().catch(() => null)) as
-        | { error?: string; codes?: string[] }
+        | { error?: string; codes?: string[]; hints?: string[] }
         | null;
 
       if (!response.ok) {
+        if (window.hcaptcha && captchaWidgetRef.current !== null) {
+          window.hcaptcha.reset(captchaWidgetRef.current);
+        }
+        setCaptchaToken("");
         const codes = payload?.codes?.length ? ` (${payload.codes.join(", ")})` : "";
-        setMessage(`${payload?.error ?? "Signup failed."}${codes}`);
+        const hints = payload?.hints?.length ? ` ${payload.hints.join(" ")}` : "";
+        setMessage(`${payload?.error ?? "Signup failed."}${codes}${hints}`);
         setLoading(false);
         return;
       }
@@ -206,7 +232,7 @@ export default function AccountPage() {
 
         <article className="card">
           <h2>{mode === "signin" ? "Sign In" : "Create Account"}</h2>
-          {mode === "signup" && (
+          {HCAPTCHA_SITE_KEY && (
             <Script src="https://js.hcaptcha.com/1/api.js" async defer onReady={() => setCaptchaReady(true)} />
           )}
           <form onSubmit={onSubmit}>
@@ -220,7 +246,7 @@ export default function AccountPage() {
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </label>
             </div>
-            {mode === "signup" && <div ref={captchaContainerRef} className="h-captcha" />}
+            {HCAPTCHA_SITE_KEY && <div ref={captchaContainerRef} className="h-captcha" />}
             <button type="submit" disabled={loading}>
               {loading ? "Please wait..." : mode === "signin" ? "Continue" : "Create Account"}
             </button>
