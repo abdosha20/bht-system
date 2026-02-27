@@ -24,6 +24,25 @@ export function createServiceClient() {
   });
 }
 
+export function createAnonServerClient() {
+  const { url, anonKey } = getPublicSupabaseEnv();
+  if (!url) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL");
+  }
+  if (!anonKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY"
+    );
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}
+
 export function createUserServerClient(accessToken: string) {
   const { url, anonKey } = getPublicSupabaseEnv();
   if (!url) {

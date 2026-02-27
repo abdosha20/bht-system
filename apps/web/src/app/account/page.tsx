@@ -1,7 +1,28 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Script from "next/script";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
+
+type HCaptchaRenderOptions = {
+  sitekey: string;
+  callback: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+};
+
+type HCaptchaApi = {
+  render: (container: string | HTMLElement, options: HCaptchaRenderOptions) => string | number;
+  reset: (widgetId?: string | number) => void;
+};
+
+declare global {
+  interface Window {
+    hcaptcha?: HCaptchaApi;
+  }
+}
+
+const HCAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
 
 export default function AccountPage() {
   const [nextPath, setNextPath] = useState("/dashboard");
@@ -11,6 +32,10 @@ export default function AccountPage() {
   const [message, setMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaReady, setCaptchaReady] = useState(false);
+  const captchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const captchaWidgetRef = useRef<string | number | null>(null);
 
   async function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -40,6 +65,38 @@ export default function AccountPage() {
       .then(({ data }) => setCurrentUser(data.user?.email ?? null))
       .catch(() => setCurrentUser(null));
   }, []);
+
+  useEffect(() => {
+    if (mode === "signup" && window.hcaptcha) {
+      setCaptchaReady(true);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "signup") {
+      setCaptchaToken("");
+      return;
+    }
+    if (!HCAPTCHA_SITE_KEY) {
+      setMessage("Missing NEXT_PUBLIC_HCAPTCHA_SITE_KEY. Set env and restart.");
+      return;
+    }
+    if (!captchaReady || !window.hcaptcha || !captchaContainerRef.current) {
+      return;
+    }
+
+    if (captchaWidgetRef.current !== null) {
+      window.hcaptcha.reset(captchaWidgetRef.current);
+      return;
+    }
+
+    captchaWidgetRef.current = window.hcaptcha.render(captchaContainerRef.current, {
+      sitekey: HCAPTCHA_SITE_KEY,
+      callback: (token: string) => setCaptchaToken(token),
+      "expired-callback": () => setCaptchaToken(""),
+      "error-callback": () => setCaptchaToken("")
+    });
+  }, [captchaReady, mode]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,13 +128,31 @@ export default function AccountPage() {
         return;
       }
 
-      const { error } = await withTimeout(getBrowserSupabaseClient().auth.signUp({ email, password }));
-      if (error) {
-        setMessage(error.message);
+      if (!captchaToken) {
+        setMessage("Complete the captcha challenge before creating an account.");
         setLoading(false);
         return;
       }
 
+      const response = await withTimeout(
+        fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, captchaToken })
+        })
+      );
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        setMessage(payload?.error ?? "Signup failed.");
+        setLoading(false);
+        return;
+      }
+
+      if (window.hcaptcha && captchaWidgetRef.current !== null) {
+        window.hcaptcha.reset(captchaWidgetRef.current);
+      }
+      setCaptchaToken("");
       setMessage("Account created. If email confirmation is enabled, confirm your email then sign in.");
       setMode("signin");
     } catch (e) {
@@ -128,6 +203,9 @@ export default function AccountPage() {
 
         <article className="card">
           <h2>{mode === "signin" ? "Sign In" : "Create Account"}</h2>
+          {mode === "signup" && (
+            <Script src="https://js.hcaptcha.com/1/api.js" async defer onReady={() => setCaptchaReady(true)} />
+          )}
           <form onSubmit={onSubmit}>
             <div className="formGrid">
               <label>
@@ -139,6 +217,7 @@ export default function AccountPage() {
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </label>
             </div>
+            {mode === "signup" && <div ref={captchaContainerRef} className="h-captcha" />}
             <button type="submit" disabled={loading}>
               {loading ? "Please wait..." : mode === "signin" ? "Continue" : "Create Account"}
             </button>

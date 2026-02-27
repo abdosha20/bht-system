@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = Math.floor(4.5 * 1024 * 1024);
 
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "File too large for this deployment. Vercel serverless uploads are limited to about 4MB per request.",
+            "File too large for this deployment. Vercel Function request payloads are limited to about 4.5MB.",
           max_bytes: MAX_UPLOAD_BYTES
         },
         { status: 413 }
